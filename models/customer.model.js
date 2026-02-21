@@ -1,0 +1,27 @@
+import mongoose from "mongoose";
+
+const customerSchema = new mongoose.Schema({
+    auth: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Auth"
+    },
+    firstName: {
+        type: String,
+        required: true
+    },
+    lastName: {
+        type: String,
+        required: true
+    },
+    phoneNumber: {
+        type: String,
+        required: true
+    },
+    loggedIn: {
+        type: Boolean,
+        default: false
+    }
+}, { timestamps: true })
+
+const Customer = mongoose.model("Customer", customerSchema)
+export default Customer;
