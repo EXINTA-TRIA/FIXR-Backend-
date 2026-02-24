@@ -14,9 +14,9 @@ import orderRoute from "./routes/order.route.js";
 import paymentRoute from "./routes/payment.route.js";
 import chatRoute from "./routes/chat.route.js";
 
-conDB();
 dotenv.config();
-const PORT = process.env.PORT || 5000;
+conDB();
+const PORT = process.env.PORT;
 const app = express();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -25,10 +25,14 @@ const __dirname = path.dirname(__filename);
 // app.use(helmet());
 
 app.use(cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+  origin: [
+    "http://localhost:5173",
+    "https://lemon-field-085ef710f.4.azurestaticapps.net"
+    
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 app.use(express.json());
