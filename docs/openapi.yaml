@@ -1,0 +1,372 @@
+openapi: 3.0.0
+info:
+  title: WTF FIXR
+  version: 1.0.0
+  description: ''
+servers:
+  - url: http://localhost:5000
+paths:
+  /api/admin/:
+    get:
+      summary: Get All Admins
+      responses: {}
+      tags:
+        - Admin
+  /api/admin/adminId:
+    get:
+      summary: Get Admin By Id
+      responses: {}
+      tags:
+        - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+  /api/artisan/:
+    get:
+      summary: Get All Artisans
+      responses: {}
+      tags:
+        - Artisan
+  /api/artisan/artisanId/:
+    get:
+      summary: Get Artisan By Id
+      responses: {}
+      tags:
+        - Artisan
+  /api/artisan/delete/:
+    delete:
+      summary: Delete Artisan By Id
+      responses: {}
+      tags:
+        - Artisan
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                artisanId:
+                  type: string
+            example:
+              artisanId: 6991d07ee00a7917200074f1
+  /api/auth/customer-signup/:
+    post:
+      summary: Signup
+      responses: {}
+      tags:
+        - Auth
+        - Customer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: color
+                phoneNumber:
+                  type: string
+                  format: utc-millisec
+            example:
+              firstName: customer
+              lastName: one
+              email: customer1@gmail.com
+              password: '123'
+              phoneNumber: '+2341234455'
+  /api/auth/customer-login/:
+    post:
+      summary: Login
+      responses: {}
+      tags:
+        - Auth
+        - Customer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: color
+            example:
+              email: customer1@gmail.com
+              password: '123'
+  /api/auth/customer-logout/:
+    post:
+      summary: Logout
+      responses: {}
+      tags:
+        - Auth
+        - Customer
+  /api/auth/artisan-signup/:
+    post:
+      summary: Signup
+      responses: {}
+      tags:
+        - Auth
+        - Artisan
+  /api/auth/artisan-login/:
+    post:
+      summary: Login
+      responses: {}
+      tags:
+        - Auth
+        - Artisan
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: color
+            example:
+              email: artisantwo@gmail.com
+              password: '123'
+  /api/auth/artisan-logout/:
+    post:
+      summary: Logout
+      responses: {}
+      tags:
+        - Auth
+        - Artisan
+  /api/auth/admin-signup/:
+    post:
+      summary: Signup
+      responses: {}
+      tags:
+        - Auth
+        - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: color
+            example:
+              firstName: admin
+              lastName: one
+              email: admin@gmail.com
+              password: '123'
+  /api/auth/admin-login/:
+    post:
+      summary: Login
+      responses: {}
+      tags:
+        - Auth
+        - Admin
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: color
+            example:
+              email: admin@gmail.com
+              password: '123'
+  /api/auth/admin-logout/:
+    post:
+      summary: Logout
+      responses: {}
+      tags:
+        - Auth
+        - Admin
+  /api/customer/:
+    get:
+      summary: Get All Customers
+      responses: {}
+      tags:
+        - Customer
+  /api/admin/customerId:
+    get:
+      summary: Get Customer By Id
+      responses: {}
+      tags:
+        - Customer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+  /api/order/:
+    post:
+      summary: Create Order
+      responses: {}
+      tags:
+        - Order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                artisanId:
+                  type: string
+                problem:
+                  type: string
+                location:
+                  type: string
+            example:
+              artisanId: 6991d0dfe00a7917200074f7
+              problem: Faulty door
+              location: xyz google street, Earth
+  /api/order/customer:
+    get:
+      summary: Get Order By Customer Id
+      responses: {}
+      tags:
+        - Order
+  /api/order/artisan:
+    get:
+      summary: Get Order By Artisan Id
+      responses: {}
+      tags:
+        - Order
+  /api/order/{orderId}/review:
+    patch:
+      summary: Add Review To Order
+      responses: {}
+      tags:
+        - Order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                comment:
+                  type: string
+                rating:
+                  type: integer
+            example:
+              comment: Poor service, very disappointing
+              rating: 1
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        deprecated: false
+        schema: {}
+        example: 699343568bf1e7415f95b878
+  /api/order/{orderId}/repair-status:
+    patch:
+      summary: Update Order Repair Status
+      responses: {}
+      tags:
+        - Order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                repairStatus:
+                  type: string
+            example:
+              repairStatus: accepted
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        deprecated: false
+        schema: {}
+        example: 699343568bf1e7415f95b878
+  /api/order/{orderId}/repair-fee:
+    patch:
+      summary: Add Repair Fee To Order
+      responses: {}
+      tags:
+        - Order
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                repairFee:
+                  type: integer
+            example:
+              repairFee: 3000
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema:
+          type: string
+        example: 699343568bf1e7415f95b878
+  /api/payment/pay/{orderId}:
+    post:
+      summary: Initiate Payment
+      responses: {}
+      tags:
+        - Payment
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        deprecated: false
+        schema: {}
+  /api/payment/payment-verification:
+    post:
+      summary: Verify Payment
+      responses: {}
+      tags:
+        - Payment
+  /api/payment/payment-cancel/{tx_ref}:
+    get:
+      summary: Cancel Payment
+      responses: {}
+      tags:
+        - Payment
+    parameters:
+      - name: tx_ref
+        in: path
+        required: true
+        deprecated: false
+        schema: {}
+  /api/payment/payment-history/customer:
+    get:
+      summary: Get Customer Payment History
+      responses: {}
+      tags:
+        - Payment
+  /api/payment/payment-history/artisan:
+    get:
+      summary: Get Artisan Payment History
+      responses: {}
+      tags:
+        - Payment
