@@ -1,9 +1,13 @@
-import { hashPassword, handleLogin, handleLogout } from "../utils/util.js";
-
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import { hashPassword } from "../utils/util.js";
 import Auth from "../models/auth.model.js";
 import Customer from "../models/customer.model.js";
 import Artisan from "../models/artisan.model.js";
 import Admin from "../models/admin.model.js";
+
+const env = process.env.NODE_ENV || "development";
+const isProduction = env === "production";
 
 export const customerSignUp = async (req, res) => {
     const { firstName, lastName, phoneNumber, email, password } = req.body;
@@ -44,19 +48,10 @@ export const customerSignUp = async (req, res) => {
         return res.status(500).json({ message: "Error in signing up customer" } || "Server error")
     }
 }
-export const customerLogin = async (req, res) => {
-    const login = handleLogin(Customer)
-    login(req, res)
-}
-export const customerLogout = async (req, res) => {
-    const customerId = req.user.id;
-    const logout = handleLogout(Customer, customerId)
-    logout(req, res)
-}
 
 export const artisanSignUp = async (req, res) => {
     //console.log(req.files)
-  
+
     const { firstName, lastName, phoneNumber, email, password, city, state, serviceRendered, serviceDescription } = req.body;
 
     if (!firstName || !lastName || !phoneNumber || !email || !password || !city || !state || !serviceRendered || !serviceDescription) {
@@ -104,18 +99,8 @@ export const artisanSignUp = async (req, res) => {
     }
 }
 
-export const artisanLogin = async (req, res) => {
-   const login =  handleLogin(Artisan)
-   login(req, res)
-}
-export const artisanLogout = async (req, res) => {
-    const artisanId = req.user.id;
-    const logout = handleLogout(Artisan, artisanId)
-    logout(req,res)
-}
-
 export const adminSignUp = async (req, res) => {
-    const { firstName, lastName, email, password} = req.body;
+    const { firstName, lastName, email, password } = req.body;
 
     if (!firstName || !lastName || !email || !password) {
         return res.status(400).json({ message: "Fill all fields" })
@@ -125,7 +110,7 @@ export const adminSignUp = async (req, res) => {
     if (existingAccount) {
         return res.status(409).json({ message: "Account exists" })
     }
-  
+
     try {
         const hashedPassword = hashPassword(password);
 
@@ -153,12 +138,62 @@ export const adminSignUp = async (req, res) => {
         return res.status(500).json({ message: "Error signing up admin" } || "Server error")
     }
 }
-export const adminLogin = async (req, res) => {
-    const login = handleLogin(Admin)
-    login(req, res)
+
+export const handleLogin = async (req, res) => {
+
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+        return res.status(400).json({
+            message: "Fill in all fields"
+        });
+    }
+
+    const existingAccount = await Auth.findOne({ email })
+
+    if (!existingAccount) {
+        return res.status(400).json({ message: "Incorrect login details" })
+    }
+
+    const passwordValid = await bcrypt.compare(password, existingAccount.password);
+
+    if (!passwordValid) {
+        return res.status(400).json({ message: "Incorrect login details" })
+    }
+
+    try {
+        const token = jwt.sign({
+            id: existingAccount.userId, email: existingAccount.email
+        }, process.env.JWT_SECRET);
+
+
+        res.cookie("stored_token", token, {
+            path: "/",
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax"
+        })
+
+        return res.status(200).json({ message: "Login successful", existingAccount });
+    } catch (err) {
+        console.log("Error in login function in auth.controller.js", err)
+        return res.status(500).json({ message: "Error logging in user" })
+    }
 }
-export const adminLogout = async (req, res) => {
-    const adminId = req.user.id;
-    const logout = handleLogout(Admin, adminId)
-    logout(req, res)
+
+export const handleLogout = async (req, res) => {
+    try {
+        res.setHeader("Cache-Control", "no-store");
+        res.setHeader("Pragma", "no-cache");
+        res.clearCookie("stored_token", {
+            path: "/",
+            httpOnly: true,
+            secure: true,
+            sameSite: "none"
+        })
+        return res.status(200).json({ message: "Logged out" });
+    } catch (err) {
+        console.log("Error in logout function in auth.controller.js")
+        return res.status(500).json({ message: "Error logging out user" } || "Server error")
+    }
 }
