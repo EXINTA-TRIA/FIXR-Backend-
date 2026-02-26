@@ -18,6 +18,14 @@ const authSchema = new mongoose.Schema({
     password: {
         type: String
     },
+    authProvider: {
+        type: String,
+        enum: ["local", "google"],
+        default: "local"
+    },
+    googleId: {
+        type: String
+    }
 }, { timestamps: true }
 )
 
