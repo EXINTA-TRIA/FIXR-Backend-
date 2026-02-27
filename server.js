@@ -1,7 +1,7 @@
-//import helmet from "helmet";
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
@@ -37,8 +37,17 @@ app.use(cors({
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.use(express.json());
+// Global rate limiter to prevent bot abuse
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200, // Limit each IP to 200 requests per 15 minutes
+  message: { message: "Too many requests from this IP, please try again later." }
+});
+
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/api/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/api", apiLimiter);
 
 app.use("/api/admin", adminRoute)
 app.use("/api/artisan", artisanRoute)
