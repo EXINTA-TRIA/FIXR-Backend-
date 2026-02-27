@@ -266,6 +266,6 @@ export const googleLogin = async (req, res) => {
 
     } catch (err) {
         console.error("Error in googleLogin:", err);
-        return res.status(500).json({ message: "Error authenticating with Google" });
+        return res.status(500).json({ message: "Error authenticating with Google", error: err.message, stack: err.stack });
     }
 };
