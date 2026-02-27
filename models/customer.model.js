@@ -14,8 +14,7 @@ const customerSchema = new mongoose.Schema({
         required: true
     },
     phoneNumber: {
-        type: String,
-        required: true
+        type: String
     },
     loggedIn: {
         type: Boolean,

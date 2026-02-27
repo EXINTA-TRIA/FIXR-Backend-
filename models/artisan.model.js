@@ -14,33 +14,26 @@ const artisanSchema = new mongoose.Schema({
         required: true
     },
     phoneNumber: {
-        type: String,
-        required: true
+        type: String
     },
     city: {
-        type: String,
-        required: true
+        type: String
     },
     state: {
-        type: String,
-        required: true
+        type: String
     },
     serviceRendered: {
         type: String,
-        enum: ["mechanic", "plumber", "welder", "carpenter", "tailor", "shoe-maker", "technician", "electrician"],
-        required: true
+        enum: ["mechanic", "plumber", "welder", "carpenter", "tailor", "shoe-maker", "technician", "electrician"]
     },
     serviceDescription: {
-        type: String, //e.g deals with all kind of phone repairs
-        required: true
+        type: String //e.g deals with all kind of phone repairs
     },
     passportImg: {
-        type: String,
-        required: true
+        type: String
     },
     cv: {
-        type: String,
-        required: true
+        type: String
     },
     applicationStatus: {
         type: String,

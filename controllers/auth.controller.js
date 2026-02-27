@@ -1,9 +1,14 @@
 import { hashPassword, handleLogin, handleLogout } from "../utils/util.js";
+import { OAuth2Client } from "google-auth-library";
+import jwt from "jsonwebtoken";
 
 import Auth from "../models/auth.model.js";
 import Customer from "../models/customer.model.js";
 import Artisan from "../models/artisan.model.js";
 import Admin from "../models/admin.model.js";
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const isProduction = process.env.NODE_ENV === "production";
 
 export const customerSignUp = async (req, res) => {
     const { firstName, lastName, phoneNumber, email, password } = req.body;
@@ -162,3 +167,103 @@ export const adminLogout = async (req, res) => {
     const logout = handleLogout(Admin, adminId)
     logout(req, res)
 }
+
+export const googleLogin = async (req, res) => {
+    const { token, userModel } = req.body; // userModel should be "Customer" or "Artisan"
+    
+    if (!token) {
+        return res.status(400).json({ message: "Google token is required" });
+    }
+
+    try {
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        const { sub: googleId, email, given_name: firstName, family_name: lastName } = payload;
+
+        let existingAccount = await Auth.findOne({ email });
+
+        if (!existingAccount) {
+            // New user registration flow via Google
+            if (!userModel || !["Customer", "Artisan"].includes(userModel)) {
+                return res.status(400).json({ message: "Valid userModel is required for Google signup" });
+            }
+
+            let newUserDetails;
+            if (userModel === "Customer") {
+                const newCustomer = new Customer({
+                    firstName: firstName || "",
+                    lastName: lastName || "",
+                    loggedIn: true
+                });
+                await newCustomer.save();
+                newUserDetails = newCustomer;
+            } else if (userModel === "Artisan") {
+                const newArtisan = new Artisan({
+                    firstName: firstName || "",
+                    lastName: lastName || "",
+                    loggedIn: true
+                });
+                await newArtisan.save();
+                newUserDetails = newArtisan;
+            }
+
+            // Create Auth document for Google OAuth
+            existingAccount = new Auth({
+                email,
+                userId: newUserDetails._id,
+                userModel,
+                authProvider: "google",
+                googleId
+            });
+            await existingAccount.save();
+
+            newUserDetails.auth = existingAccount._id;
+            await newUserDetails.save();
+        } else {
+            // For an existing user, update loggedIn status to true
+            try {
+               let AccountModel;
+               if (existingAccount.userModel === "Customer") AccountModel = Customer;
+               if (existingAccount.userModel === "Artisan") AccountModel = Artisan;
+               if (existingAccount.userModel === "Admin") AccountModel = Admin;
+
+               if (AccountModel) {
+                   const accountDetails = await AccountModel.findById(existingAccount.userId);
+                   if (accountDetails) {
+                       accountDetails.loggedIn = true;
+                       await accountDetails.save();
+                   }
+               }
+            } catch (err) {
+                console.log("Error updating loggedin status:", err);
+            }
+        }
+
+        const sessionToken = jwt.sign({
+            id: existingAccount.userId, email: existingAccount.email
+        }, process.env.JWT_SECRET);
+
+        res.cookie("stored_token", sessionToken, {
+            path: "/",
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax"
+        });
+
+        let FinalModel;
+        if (existingAccount.userModel === "Customer") FinalModel = Customer;
+        else if (existingAccount.userModel === "Artisan") FinalModel = Artisan;
+        else FinalModel = Admin;
+
+        const returnedAccountDetails = await FinalModel.findById(existingAccount.userId);
+
+        return res.status(200).json({ message: "Login successful", accountDetails: returnedAccountDetails });
+
+    } catch (err) {
+        console.error("Error in googleLogin:", err);
+        return res.status(500).json({ message: "Error authenticating with Google" });
+    }
+};
