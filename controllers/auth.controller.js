@@ -70,7 +70,7 @@ export const customerLogout = async (req, res) => {
 export const artisanSignUp = async (req, res) => {
     //console.log(req.files)
   
-    const { firstName, lastName, phoneNumber, email, password, city, state, serviceRendered, serviceDescription } = req.body;
+    const { firstName, lastName, phoneNumber, email, password, city, state, serviceRendered, serviceDescription, passportImg, cv } = req.body;
 
     if (!firstName || !lastName || !phoneNumber || !email || !password || !city || !state || !serviceRendered || !serviceDescription) {
         return res.status(400).json({ message: "Fill all fields" })
@@ -92,8 +92,8 @@ export const artisanSignUp = async (req, res) => {
             state,
             serviceRendered,
             serviceDescription,
-            passportImg: req.files.passportImg?.[0].filename,
-            cv: req.files.cv?.[0].filename
+            passportImg,
+            cv
         })
         await newArtisan.save()
 
