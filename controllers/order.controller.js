@@ -1,21 +1,41 @@
 import Artisan from "../models/artisan.model.js";
 import Order from "../models/order.model.js";
+import fs from "fs";
+import path from "path";
 
 export const createOrderByCustomer = async (req, res) => {
     const customerId = req.user.id
 
-    const { artisanId, problem, location } = req.body;
+    const { artisanId, problem, location, images } = req.body;
 
     if (!artisanId || !problem || !location) {
         return res.status(400).json({ message: "Fill all fields" })
     }
 
     try {
+        let savedImages = [];
+        if (images && Array.isArray(images)) {
+            for (let i = 0; i < images.length; i++) {
+                try {
+                    const base64Data = images[i].replace(/^data:image\/\w+;base64,/, "");
+                    const extMatch = images[i].match(/^data:image\/(\w+);base64,/);
+                    const ext = extMatch ? extMatch[1] : 'jpg';
+                    const filename = `issue-${Date.now()}-${i}.${ext}`;
+                    const filepath = path.join(process.cwd(), 'uploads', filename);
+                    fs.writeFileSync(filepath, base64Data, 'base64');
+                    savedImages.push(filename);
+                } catch(e) {
+                    console.error("Error saving base64 image:", e);
+                }
+            }
+        }
+
         const newOrder = new Order({
             customerId,
             artisanId,
             problem,
-            location
+            location,
+            images: savedImages
         })
         await newOrder.save()
 
