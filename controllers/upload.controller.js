@@ -45,12 +45,18 @@ export const generateSasToken = async (req, res) => {
         const uniqueFilename = `${crypto.randomUUID()}-${fileName}`;
         const blobClient = containerClient.getBlobClient(uniqueFilename);
 
+        // Create dates for the SAS token, allowing for slight clock skew
+        const startsOn = new Date();
+        startsOn.setMinutes(startsOn.getMinutes() - 10); // 10 minutes in the past
+        
+        const expiresOn = new Date(new Date().valueOf() + 3600 * 1000); // 1 hour
+
         const sasOptions = {
             containerName,
             blobName: uniqueFilename,
             permissions: BlobSASPermissions.parse("racw"), // Read, Add, Create, Write
-            startsOn: new Date(),
-            expiresOn: new Date(new Date().valueOf() + 3600 * 1000), // Expires in 1 hour
+            startsOn,
+            expiresOn,
         };
 
         const sasToken = generateBlobSASQueryParameters(sasOptions, sharedKeyCredential).toString();
