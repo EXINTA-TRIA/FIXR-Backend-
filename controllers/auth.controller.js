@@ -7,7 +7,6 @@ import Customer from "../models/customer.model.js";
 import Artisan from "../models/artisan.model.js";
 import Admin from "../models/admin.model.js";
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const isProduction = process.env.NODE_ENV === "production";
 
 export const customerSignUp = async (req, res) => {
@@ -176,6 +175,7 @@ export const googleLogin = async (req, res) => {
     }
 
     try {
+        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
         const ticket = await client.verifyIdToken({
             idToken: token,
             audience: process.env.GOOGLE_CLIENT_ID,
