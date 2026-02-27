@@ -132,10 +132,7 @@ export const updateOrderRepairFee = async (req, res) => {
 export const updateOrderRepairReport = async (req, res) => {
 
     const { orderId } = req.params;
-    const { note } = req.body
-
-    const preImg = req.files.preImg?.[0].filename
-    const postImg = req.files.postImg?.[0].filename
+    const { note, preImg, postImg } = req.body
 
     //console.log(preImg, postImg)
 

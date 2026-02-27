@@ -14,12 +14,9 @@ export const getMessagesByOrder = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
     const { orderId } = req.params;
-    const { text } = req.body;
+    const { text, image } = req.body;
     const senderId = req.user.id;
     const senderModel = req.user.role === "customer" ? "Customer" : "Artisan";
-    
-    // Support image attachments from multer
-    const image = req.file ? req.file.filename : null;
 
     if (!text && !image) {
         return res.status(400).json({ message: "Message text or image is required" });
