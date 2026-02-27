@@ -176,17 +176,14 @@ export const googleLogin = async (req, res) => {
 
     try {
         // Fetch user profile from Google using the access_token directly
-        const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-            headers: { Authorization: `Bearer ${token}` }
+        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+        client.setCredentials({ access_token: token });
+        
+        const oauth2Response = await client.request({
+            url: "https://www.googleapis.com/oauth2/v3/userinfo"
         });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Google rejected token:", errorText);
-            return res.status(401).json({ message: "Google token invalid or expired", details: errorText });
-        }
-
-        const payload = await response.json();
+        
+        const payload = oauth2Response.data;
         const { sub: googleId, email, given_name: firstName, family_name: lastName } = payload;
 
         let existingAccount = await Auth.findOne({ email });
