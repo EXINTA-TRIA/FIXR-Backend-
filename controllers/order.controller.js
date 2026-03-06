@@ -1,4 +1,5 @@
 import Artisan from "../models/artisan.model.js";
+import Customer from "../models/customer.model.js";
 import Order from "../models/order.model.js";
 import fs from "fs";
 import path from "path";
@@ -114,13 +115,48 @@ export const updateOrderReview = async (req, res) => {
 
 export const updateOrderRepairStatus = async (req, res) => {
     const { orderId } = req.params;
-    const { repairStatus } = req.body
+    const { repairStatus } = req.body;
     try {
-        let orders = await Order.findByIdAndUpdate(orderId, { repairStatus }, { new: true })
-        return res.status(200).json(orders)
+        let order = await Order.findByIdAndUpdate(orderId, { repairStatus }, { new: true });
+
+        // Send email notification to customer on decline or delivery
+        if (repairStatus === "declined" || repairStatus === "delivered") {
+            try {
+                const customer = await Customer.findById(order.customerId).populate("auth");
+                const artisan = await Artisan.findById(order.artisanId);
+                const artisanName = artisan ? `${artisan.firstName} ${artisan.lastName}` : "Your artisan";
+
+                if (customer?.auth?.email) {
+                    if (repairStatus === "declined") {
+                        await sendEmail({
+                            to: customer.auth.email,
+                            subject: "Your Fixr booking has been declined",
+                            html: `<p>Hi ${customer.firstName},</p>
+                                   <p>Unfortunately, <strong>${artisanName}</strong> was unable to take your booking for: <em>${order.problem}</em>.</p>
+                                   <p>Don't worry — you can easily find another verified artisan on Fixr to handle your repair.</p>
+                                   <p>Log in to your dashboard to book a new artisan.</p>
+                                   <p>— The Fixr Team</p>`
+                        });
+                    } else if (repairStatus === "delivered") {
+                        await sendEmail({
+                            to: customer.auth.email,
+                            subject: "Your repair is complete! 🎉",
+                            html: `<p>Hi ${customer.firstName},</p>
+                                   <p>Great news! <strong>${artisanName}</strong> has completed your repair for: <em>${order.problem}</em>.</p>
+                                   <p>We hope you're satisfied with the service. Please log in to leave a review and help other customers find great artisans!</p>
+                                   <p>— The Fixr Team</p>`
+                        });
+                    }
+                }
+            } catch (mailErr) {
+                console.error("Error sending status notification email to customer", mailErr);
+            }
+        }
+
+        return res.status(200).json(order);
     } catch (err) {
-        console.log("Error in updateOrderRepairStatus function in order.controller.js", err.message)
-        return res.status(500).json({ message: "Error adding repair status to order" })
+        console.log("Error in updateOrderRepairStatus function in order.controller.js", err.message);
+        return res.status(500).json({ message: "Error adding repair status to order" });
     }
 }
 export const updateOrderRepairFee = async (req, res) => {
