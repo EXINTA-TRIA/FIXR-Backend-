@@ -75,16 +75,40 @@ export const getOrderByArtisanId = async (req, res) => {
 export const updateOrderReview = async (req, res) => {
     const customerId = req.user.id;
     const { orderId } = req.params;
-    const { comment, rating } = req.body
+    const { comment, rating, tags, photos } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating is required and must be between 1 and 5" });
+    }
+
     try {
-        let order = await Order.findByIdAndUpdate(orderId, { review: { customerId, comment, rating } }, { new: true })
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" });
+        }
 
-        const artisan = await Artisan.findByIdAndUpdate(order.artisanId, { $push: { reviews: { customerId, comment, rating } } }, { new: true });
+        // Prevent duplicate reviews
+        if (order.review && order.review.rating) {
+            return res.status(400).json({ message: "You have already reviewed this order" });
+        }
 
-        return res.status(200).json(order)
+        // Verify the customer owns this order
+        if (order.customerId.toString() !== customerId) {
+            return res.status(403).json({ message: "You can only review your own orders" });
+        }
+
+        const reviewData = { customerId, comment, rating, tags: tags || [], photos: photos || [], createdAt: new Date() };
+
+        const updatedOrder = await Order.findByIdAndUpdate(orderId, { review: reviewData }, { new: true });
+
+        await Artisan.findByIdAndUpdate(order.artisanId, {
+            $push: { reviews: reviewData }
+        }, { new: true });
+
+        return res.status(200).json(updatedOrder);
     } catch (err) {
-        console.log("Error in updateOrderReview function in order.controller.js", err.message)
-        return res.status(500).json({ message: "Error adding review to order" })
+        console.log("Error in updateOrderReview function in order.controller.js", err.message);
+        return res.status(500).json({ message: "Error adding review to order" });
     }
 }
 
