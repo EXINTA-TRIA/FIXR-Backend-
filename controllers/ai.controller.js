@@ -62,19 +62,36 @@ export const aiChat = async (req, res) => {
                 if (serviceRendered) query.serviceRendered = serviceRendered.toLowerCase();
                 if (city) query.city = new RegExp(city, "i");
                 
-                // Fetch top 3 matches (in a real scenario, applying the .ipynb ranking logic here)
-                const artisans = await Artisan.find(query).limit(3).lean();
+                // Fetch all matches for the requested service
+                const artisans = await Artisan.find(query).lean();
                 
-                let matches = artisans.map(a => {
-                    const avgRating = a.reviews?.length ? (a.reviews.reduce((sum, r) => sum + r.rating, 0) / a.reviews.length).toFixed(1) : "New";
+                // DATA SCIENCE RANKING ALGORITHM
+                // We rank based on: 40% Rating, 30% Experience, 30% Non-Complaint Rate
+                let rankedArtisans = artisans.map(a => {
+                    const ratingScore = a.reviews?.length ? (a.reviews.reduce((sum, r) => sum + r.rating, 0) / a.reviews.length) : 0;
+                    
+                    // Normalize scores (Rating out of 5, Experience capped at 25 years, Complaint Rate is ideally 0)
+                    const normalizedRating = ratingScore / 5;
+                    const normalizedExperience = Math.min(a.yearsOfExperience || 1, 25) / 25; 
+                    const normalizedComplaint = 1 - Math.min(a.complaintRate || 0, 1);
+                    
+                    const bookingProbability = (0.4 * normalizedRating) + (0.3 * normalizedExperience) + (0.3 * normalizedComplaint);
+
                     return {
                         name: `${a.firstName} ${a.lastName}`,
                         service: a.serviceRendered,
-                        rating: avgRating,
+                        rating: ratingScore > 0 ? ratingScore.toFixed(1) : "New",
+                        experience: a.yearsOfExperience,
+                        complaintRate: a.complaintRate || 0,
+                        bookingProbability: parseFloat(bookingProbability.toFixed(3)),
                         id: a._id.toString(),
                         city: a.city
                     };
                 });
+                
+                // Sort by booking probability descending and pick top 3
+                rankedArtisans.sort((a, b) => b.bookingProbability - a.bookingProbability);
+                const matches = rankedArtisans.slice(0, 3);
                 
                 const apiResponse = { 
                     result: matches.length > 0 ? matches : "No artisans found matching this criteria." 

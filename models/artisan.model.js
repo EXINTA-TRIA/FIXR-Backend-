@@ -22,10 +22,27 @@ const artisanSchema = new mongoose.Schema({
     },
     serviceRendered: {
         type: String,
-        enum: ["mechanic", "plumber", "welder", "carpenter", "tailor", "shoe-maker", "technician", "electrician"]
+        enum: ["mechanic", "plumber", "welder", "carpenter", "tailor", "shoe-maker", "technician", "electrician", "painter", "jeweler"]
     },
     serviceDescription: {
         type: String //e.g deals with all kind of phone repairs
+    },
+    yearsOfExperience: {
+        type: Number,
+        default: 0
+    },
+    completedJobs: {
+        type: Number,
+        default: 0
+    },
+    complaintRate: {
+        type: Number,
+        default: 0
+    },
+    availability: {
+        type: String,
+        enum: ["Available", "Busy", "Offline"],
+        default: "Available"
     },
     passportImg: {
         type: String
