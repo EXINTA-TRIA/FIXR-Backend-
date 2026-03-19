@@ -7,7 +7,7 @@ import { getAllArtisan, getArtisanById, updateArtisanStatus, deleteArtisanById }
 
 const router = express.Router();
 
-router.get("/", verifyAccessByLogin, getAllArtisan)
+router.get("/", getAllArtisan)
 router.get("/artisanId", verifyAccessByLogin, getArtisanById)
 router.patch("/status", verifyAccessByModel(Admin), updateArtisanStatus)
 router.delete("/delete", verifyAccessByModel(Admin), deleteArtisanById)
