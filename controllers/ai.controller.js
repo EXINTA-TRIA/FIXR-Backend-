@@ -11,12 +11,26 @@ export const aiChat = async (req, res) => {
             return res.status(400).json({ message: "Messages array is required" });
         }
 
-        const systemPrompt = `You are 'FixrBot', a helpful assistant for the Fixr repair marketplace. Your job is to help customers figure out what kind of artisan they need (e.g., Plumber vs Electrician), answer basic queries, and guide them on how to book on the platform. Keep your responses friendly, very concise, and directly helpful. Do not provide actual DIY repair instructions for safety reasons - always recommend an artisan.`;
+        const systemPrompt = `You are 'FixrBot', a helpful assistant for the Fixr repair marketplace. Fixr serves BOTH home/property repairs AND automotive/vehicle repairs. The platform explicitly supports the following artisan types: mechanic, plumber, welder, carpenter, tailor, shoe-maker, technician, and electrician. Your job is to help customers figure out what kind of artisan they need based on their problem, answer basic queries, and guide them on how to book on the platform. Keep your responses friendly, very concise, and directly helpful. Do not provide actual DIY repair instructions for safety reasons - always recommend an artisan. When suggesting artisans from your search, format their names as markdown links to their profiles using this exact syntax: [Name](/artisan/id). For example: "I recommend [John Doe](/artisan/65abc123...)."`;
 
-        // Configure Gemini 2.5 Flash
+        // Configure Gemini 2.5 Flash with Tools
         const model = genAI.getGenerativeModel({ 
             model: "gemini-2.5-flash",
-            systemInstruction: systemPrompt 
+            systemInstruction: systemPrompt,
+            tools: [{
+                functionDeclarations: [{
+                    name: "suggest_artisans",
+                    description: "Search the FIXR database for real, verified artisans based on the service needed. Use this whenever the user asks for a recommendation, needs someone to fix something, or asks to find an artisan. Supported services: mechanic, plumber, welder, carpenter, tailor, shoe-maker, technician, electrician.",
+                    parameters: {
+                        type: "OBJECT",
+                        properties: {
+                            serviceRendered: { type: "STRING", description: "The type of artisan needed (e.g. 'plumber', 'mechanic', 'electrician')." },
+                            city: { type: "STRING", description: "Optional city of the user" }
+                        },
+                        required: ["serviceRendered"]
+                    }
+                }]
+            }]
         });
 
         // Convert the previous frontend messages into Google Generative AI format
@@ -35,7 +49,64 @@ export const aiChat = async (req, res) => {
 
         const chat = model.startChat({ history });
 
-        const result = await chat.sendMessage(latestMessage);
+        let result = await chat.sendMessage(latestMessage);
+        
+        // Check if Gemini wants to call our function
+        const functionCalls = result.response.functionCalls();
+        if (functionCalls && functionCalls.length > 0) {
+            const call = functionCalls[0];
+            if (call.name === "suggest_artisans") {
+                const { serviceRendered, city } = call.args;
+                
+                let query = { applicationStatus: "approved" };
+                if (serviceRendered) query.serviceRendered = serviceRendered.toLowerCase();
+                if (city) query.city = new RegExp(city, "i");
+                
+                // Fetch all matches for the requested service
+                const artisans = await Artisan.find(query).lean();
+                
+                // DATA SCIENCE RANKING ALGORITHM
+                // We rank based on: 40% Rating, 30% Experience, 30% Non-Complaint Rate
+                let rankedArtisans = artisans.map(a => {
+                    const ratingScore = a.reviews?.length ? (a.reviews.reduce((sum, r) => sum + r.rating, 0) / a.reviews.length) : 0;
+                    
+                    // Normalize scores (Rating out of 5, Experience capped at 25 years, Complaint Rate is ideally 0)
+                    const normalizedRating = ratingScore / 5;
+                    const normalizedExperience = Math.min(a.yearsOfExperience || 1, 25) / 25; 
+                    const normalizedComplaint = 1 - Math.min(a.complaintRate || 0, 1);
+                    
+                    const bookingProbability = (0.4 * normalizedRating) + (0.3 * normalizedExperience) + (0.3 * normalizedComplaint);
+
+                    return {
+                        name: `${a.firstName} ${a.lastName}`,
+                        service: a.serviceRendered,
+                        rating: ratingScore > 0 ? ratingScore.toFixed(1) : "New",
+                        experience: a.yearsOfExperience,
+                        complaintRate: a.complaintRate || 0,
+                        bookingProbability: parseFloat(bookingProbability.toFixed(3)),
+                        id: a._id.toString(),
+                        city: a.city
+                    };
+                });
+                
+                // Sort by booking probability descending and pick top 3
+                rankedArtisans.sort((a, b) => b.bookingProbability - a.bookingProbability);
+                const matches = rankedArtisans.slice(0, 3);
+                
+                const apiResponse = { 
+                    result: matches.length > 0 ? matches : "No artisans found matching this criteria." 
+                };
+                
+                // Send the DB results back to Gemini so it can generate a final response
+                result = await chat.sendMessage([{
+                    functionResponse: {
+                        name: "suggest_artisans",
+                        response: apiResponse
+                    }
+                }]);
+            }
+        }
+
         const responseText = result.response.text();
 
         return res.status(200).json({ reply: responseText });

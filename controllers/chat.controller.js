@@ -4,7 +4,24 @@ import Order from "../models/order.model.js";
 export const getMessagesByOrder = async (req, res) => {
     const { orderId } = req.params;
     try {
-        const messages = await Message.find({ orderId }).sort({ createdAt: 1 });
+        const currentOrder = await Order.findById(orderId);
+        if (!currentOrder) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        // Find all orders between this exact customer and artisan
+        const customerIdMatch = currentOrder.customerId ? currentOrder.customerId.toString() : null;
+        const artisanIdMatch = currentOrder.artisanId ? currentOrder.artisanId.toString() : null;
+
+        const matchingOrders = await Order.find({ 
+            customerId: customerIdMatch, 
+            artisanId: artisanIdMatch 
+        }).select('_id');
+        
+        const matchingOrderIds = matchingOrders.map(order => order._id.toString());
+
+        // Fetch messages belonging to ANY of those orders
+        const messages = await Message.find({ orderId: { $in: matchingOrderIds } }).sort({ createdAt: 1 });
         return res.status(200).json(messages);
     } catch (err) {
         console.log("Error in getMessagesByOrder function", err.message);
