@@ -17,6 +17,7 @@ import chatRoute from "./routes/chat.route.js";
 import aiRoute from "./routes/ai.route.js";
 import uploadRoute from "./routes/upload.route.js";
 import reconciliationRoute from "./routes/reconciliation.route.js";
+import draftRoute from "./routes/draft.route.js";
 
 dotenv.config();
 conDB();
@@ -61,6 +62,7 @@ app.use("/api/chat", chatRoute)
 app.use("/api/ai", aiRoute)
 app.use("/api/upload", uploadRoute)
 app.use("/api/reconciliation", reconciliationRoute)
+app.use("/api/draft", draftRoute)
 
 
 app.listen(PORT, "0.0.0.0", () => {
