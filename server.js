@@ -65,6 +65,16 @@ app.use("/api/upload", uploadRoute)
 app.use("/api/reconciliation", reconciliationRoute)
 app.use("/api/draft", draftRoute)
 
+// Health check endpoint
+app.get("/health", (req, res) => {
+    res.status(200).json({ 
+        status: "ok", 
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+    });
+});
+
+
 
 app.listen(PORT, "0.0.0.0", () => {
     console.log("Server running on port", PORT)
