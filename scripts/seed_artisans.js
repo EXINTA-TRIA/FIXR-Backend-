@@ -1,10 +1,13 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import bcrypt from "bcryptjs";
 import Artisan from "../models/artisan.model.js";
+import Auth from "../models/auth.model.js";
 
 dotenv.config();
 
-const DB_URL = process.env.MONGODB_URI || "mongodb://localhost:27017/fixr";
+const DB_URL = process.env.MONGO_URI || "mongodb://localhost:27017/fixr";
+const DEFAULT_PASS = await bcrypt.hash("Artisan@123", 10);
 
 const CITIES = ["Lagos", "Enugu", "Port Harcourt", "Kano", "Abuja", "Ibadan", "Kaduna"];
 const SERVICES = ["technician", "jeweler", "electrician", "carpenter", "tailor", "plumber", "painter", "mechanic"];
@@ -48,17 +51,32 @@ for (let i = 0; i < 40; i++) {
 const seedDatabase = async () => {
     try {
         await mongoose.connect(DB_URL);
-        console.log("Connected to MongoDB");
+        console.log("Connected to MongoDB using:", DB_URL.split('@').pop());
 
-        // IMPORTANT: We only delete seeded ones if we wanted to be perfectly clean, 
-        // but let's just insert these 50 so we don't wipe active users.
-        // Or to prevent duplicates, maybe clear ONLY ones with NO auth attached.
-        await Artisan.deleteMany({ auth: { $exists: false } }); 
-        console.log("Cleared old mock artisans");
+        // Target the faulty artisans that were created without auth mappings and wipe them cleanly
+        const brokenArtisans = await Artisan.find({ auth: { $exists: false } });
+        console.log(`Found ${brokenArtisans.length} broken mock artisans to overwrite.`);
+        await Artisan.deleteMany({ auth: { $exists: false } });
 
-        const artisansToInsert = initialArtisans.map((a) => {
+        let createdCount = 0;
+
+        for (const [index, a] of initialArtisans.entries()) {
+            const emailIdentifier = `${a.firstName.toLowerCase()}.${a.lastName.toLowerCase()}${index}@fixr.ng`;
+            
+            // Skip duplicates safely
+            const exists = await Auth.findOne({ email: emailIdentifier });
+            if (exists) continue;
+
+            const auth = await Auth.create({
+                email: emailIdentifier,
+                password: DEFAULT_PASS,
+                userModel: "Artisan",
+            });
+
             const cRate = a.complaintRate ?? Number(randomRange(0.0, 0.15).toFixed(3));
-            return {
+
+            const artisan = await Artisan.create({
+                auth: auth._id,
                 firstName: a.firstName,
                 lastName: a.lastName,
                 serviceRendered: a.serviceRendered,
@@ -69,8 +87,9 @@ const seedDatabase = async () => {
                 city: a.city,
                 state: a.city, // using city as state for simplicity
                 applicationStatus: "approved",
+                passportImg: "https://placehold.co/400x400/1a1a2e/ffffff?text=FIXR",
+                phoneNumber: `0803123${String(index).padStart(4, '0')}`,
                 serviceDescription: `Professional ${a.serviceRendered} based in ${a.city} with ${a.yearsOfExperience} years of experience.`,
-                // Embed a single mock review to achieve the exact average rating desired
                 reviews: [
                     {
                         comment: `Reliable and hardworking ${a.serviceRendered}.`,
@@ -79,11 +98,14 @@ const seedDatabase = async () => {
                         createdAt: new Date()
                     }
                 ]
-            };
-        });
+            });
 
-        await Artisan.insertMany(artisansToInsert);
-        console.log(`Successfully seeded ${artisansToInsert.length} artisans.`);
+            // Back-fill the mapping safely
+            await Auth.findByIdAndUpdate(auth._id, { userId: artisan._id });
+            createdCount++;
+        }
+
+        console.log(`Successfully seeded ${createdCount} strictly bound artisans into the cloud DB.`);
 
     } catch (err) {
         console.error("Error seeding database:", err);
