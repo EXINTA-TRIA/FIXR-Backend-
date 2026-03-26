@@ -4,8 +4,37 @@ import Auth from "../models/auth.model.js"
 //when filtering by location or sending aritsan to customer, send only approved artisans (application status)
 export const getAllArtisan = async (req, res) => {
     try {
-        const allArtisans = await Artisan.find().populate("auth", "email -_id");
-        return res.status(200).json(allArtisans)
+        const { page, limit, skip, usePagination } = getPagination(req.query);
+        const selectFields = buildSelect(req.query.fields);
+
+        let query = Artisan.find();
+        if (selectFields) {
+            query = query.select(selectFields);
+        }
+        query = query.populate("auth", "email -_id");
+
+        if (usePagination) {
+            query = query.skip(skip).limit(limit);
+        }
+
+        const [artisans, total] = await Promise.all([
+            query,
+            usePagination ? Artisan.countDocuments() : Promise.resolve(null)
+        ]);
+
+        if (!usePagination) {
+            return res.status(200).json(artisans);
+        }
+
+        return res.status(200).json({
+            data: artisans,
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     } catch (error) {
         console.log("Error in getAllArtisan function in artisan.controller.js", error.message)
         res.status(500).json({message: "Error fetching artisans"})
@@ -67,3 +96,27 @@ export const deleteArtisanById = async (req, res) => {
         res.status(500).json({ message: "Error in deleting artisan"})
     }
 }
+
+const getPagination = (query = {}) => {
+    const rawPage = Number(query.page);
+    const rawLimit = Number(query.limit);
+    const usePagination = Number.isFinite(rawPage) || Number.isFinite(rawLimit);
+
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+    const skip = (page - 1) * limit;
+
+    return { page, limit, skip, usePagination };
+};
+
+const buildSelect = (fields) => {
+    if (!fields) return null;
+    const cleaned = String(fields)
+        .split(",")
+        .map((field) => field.trim())
+        .filter(Boolean);
+
+    if (cleaned.length === 0) return null;
+    if (!cleaned.includes("_id")) cleaned.unshift("_id");
+    return cleaned.join(" ");
+};

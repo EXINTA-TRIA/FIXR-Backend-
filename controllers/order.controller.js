@@ -55,8 +55,37 @@ export const createOrderByCustomer = async (req, res) => {
 export const getOrderByCustomerId = async (req, res) => {
     const customerId = req.user.id
     try {
-        let orders = await Order.find({ customerId }).sort({ createdAt: -1 }).populate("artisanId")
-        return res.status(200).json(orders)
+        const { page, limit, skip, usePagination } = getPagination(req.query);
+        const selectFields = buildSelect(req.query.fields);
+
+        let query = Order.find({ customerId }).sort({ createdAt: -1 });
+        if (selectFields) {
+            query = query.select(selectFields);
+        }
+        query = query.populate("artisanId");
+
+        if (usePagination) {
+            query = query.skip(skip).limit(limit);
+        }
+
+        const [orders, total] = await Promise.all([
+            query,
+            usePagination ? Order.countDocuments({ customerId }) : Promise.resolve(null)
+        ]);
+
+        if (!usePagination) {
+            return res.status(200).json(orders);
+        }
+
+        return res.status(200).json({
+            data: orders,
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     } catch (err) {
         console.log("Error in getOrderByCustomerId  function in order.controller.js", err.message)
         return res.status(500).json({ message: "Error fetching customer's orders" })
@@ -66,8 +95,25 @@ export const getOrderByCustomerId = async (req, res) => {
 export const getOrderByArtisanId = async (req, res) => {
     const artisanId = req.user.id
     try {
-        let orders = await Order.find({ artisanId }).sort({ createdAt: -1 }).populate("customerId").lean()
-        const reconciliations = await Reconciliation.find({ artisanId }).lean();
+        const { page, limit, skip, usePagination } = getPagination(req.query);
+        const selectFields = buildSelect(req.query.fields);
+
+        let query = Order.find({ artisanId }).sort({ createdAt: -1 });
+        if (selectFields) {
+            query = query.select(selectFields);
+        }
+        query = query.populate("customerId").lean();
+
+        if (usePagination) {
+            query = query.skip(skip).limit(limit);
+        }
+
+        let orders = await query;
+        const orderIds = orders.map(order => order._id);
+        const reconciliations = await Reconciliation.find({ 
+            artisanId, 
+            orderId: { $in: orderIds } 
+        }).lean();
         
         orders = orders.map(order => {
             const rec = reconciliations.find(r => r.orderId.toString() === order._id.toString());
@@ -76,8 +122,21 @@ export const getOrderByArtisanId = async (req, res) => {
             }
             return order;
         });
-        
-        return res.status(200).json(orders)
+
+        if (!usePagination) {
+            return res.status(200).json(orders);
+        }
+
+        const total = await Order.countDocuments({ artisanId });
+        return res.status(200).json({
+            data: orders,
+            meta: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
     } catch (err) {
         console.log("Error in getOrderByArtisanId function in order.controller.js", err.message)
         return res.status(500).json({ message: "Error fetching artisan's orders" })
@@ -273,3 +332,27 @@ export const updateOrderPaymentStatus = async (req, res) => {
         return res.status(500).json({ message: "Error confirming payment" });
     }
 }
+
+const getPagination = (query = {}) => {
+    const rawPage = Number(query.page);
+    const rawLimit = Number(query.limit);
+    const usePagination = Number.isFinite(rawPage) || Number.isFinite(rawLimit);
+
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 100) : 20;
+    const skip = (page - 1) * limit;
+
+    return { page, limit, skip, usePagination };
+};
+
+const buildSelect = (fields) => {
+    if (!fields) return null;
+    const cleaned = String(fields)
+        .split(",")
+        .map((field) => field.trim())
+        .filter(Boolean);
+
+    if (cleaned.length === 0) return null;
+    if (!cleaned.includes("_id")) cleaned.unshift("_id");
+    return cleaned.join(" ");
+};
