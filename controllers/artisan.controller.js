@@ -6,8 +6,9 @@ export const getAllArtisan = async (req, res) => {
     try {
         const { page, limit, skip, usePagination } = getPagination(req.query);
         const selectFields = buildSelect(req.query.fields);
+        const filter = buildArtisanFilter(req.query);
 
-        let query = Artisan.find();
+        let query = Artisan.find(filter);
         if (selectFields) {
             query = query.select(selectFields);
         }
@@ -19,7 +20,7 @@ export const getAllArtisan = async (req, res) => {
 
         const [artisans, total] = await Promise.all([
             query,
-            usePagination ? Artisan.countDocuments() : Promise.resolve(null)
+            usePagination ? Artisan.countDocuments(filter) : Promise.resolve(null)
         ]);
 
         if (!usePagination) {
@@ -42,7 +43,7 @@ export const getAllArtisan = async (req, res) => {
 }
 
 export const getArtisanById = async (req, res) => {
-    const artisanId = req.body.id
+    const artisanId = req.params.id ?? req.body.id
 
     if (!artisanId) {
         return res.status(400).json({ message: "Provide artisan Id"});
@@ -119,4 +120,35 @@ const buildSelect = (fields) => {
     if (cleaned.length === 0) return null;
     if (!cleaned.includes("_id")) cleaned.unshift("_id");
     return cleaned.join(" ");
+};
+
+const buildArtisanFilter = (query = {}) => {
+    const filter = {};
+    if (query.status) {
+        filter.applicationStatus = String(query.status).toLowerCase();
+    }
+    if (query.service) {
+        filter.serviceRendered = String(query.service).toLowerCase();
+    }
+    if (query.state) {
+        filter.state = new RegExp(`^${escapeRegex(query.state)}$`, "i");
+    }
+    if (query.city) {
+        filter.city = new RegExp(`^${escapeRegex(query.city)}$`, "i");
+    }
+    if (query.search) {
+        const term = escapeRegex(query.search);
+        const regex = new RegExp(term, "i");
+        filter.$or = [
+            { firstName: regex },
+            { lastName: regex },
+            { serviceRendered: regex },
+            { serviceDescription: regex }
+        ];
+    }
+    return filter;
+};
+
+const escapeRegex = (value) => {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };

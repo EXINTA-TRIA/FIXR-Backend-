@@ -333,6 +333,38 @@ export const updateOrderPaymentStatus = async (req, res) => {
     }
 }
 
+export const getOrderById = async (req, res) => {
+    const { orderId } = req.params;
+    const userId = req.user?.id;
+
+    if (!orderId) {
+        return res.status(400).json({ message: "Order ID is required" });
+    }
+
+    try {
+        const order = await Order.findById(orderId)
+            .populate("artisanId")
+            .populate("customerId")
+            .lean();
+
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        const customerId = order.customerId?._id?.toString() || order.customerId?.toString();
+        const artisanId = order.artisanId?._id?.toString() || order.artisanId?.toString();
+
+        if (!userId || (userId !== customerId && userId !== artisanId)) {
+            return res.status(403).json({ message: "Access denied" });
+        }
+
+        return res.status(200).json(order);
+    } catch (err) {
+        console.log("Error in getOrderById function in order.controller.js", err.message);
+        return res.status(500).json({ message: "Error fetching order" });
+    }
+};
+
 const getPagination = (query = {}) => {
     const rawPage = Number(query.page);
     const rawLimit = Number(query.limit);
