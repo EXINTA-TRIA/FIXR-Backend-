@@ -2,6 +2,7 @@ import Artisan from "../models/artisan.model.js";
 import Customer from "../models/customer.model.js";
 import Order from "../models/order.model.js";
 import Reconciliation from "../models/reconciliation.model.js";
+import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
 import { v2 as cloudinary } from "cloudinary";
@@ -55,10 +56,11 @@ export const createOrderByCustomer = async (req, res) => {
 export const getOrderByCustomerId = async (req, res) => {
     const customerId = req.user.id
     try {
+        const filter = buildOrderFilter({ ownerKey: "customerId", ownerId: customerId, query: req.query });
         const { page, limit, skip, usePagination } = getPagination(req.query);
         const selectFields = buildSelect(req.query.fields);
 
-        let query = Order.find({ customerId }).sort({ createdAt: -1 });
+        let query = Order.find(filter).sort({ createdAt: -1 });
         if (selectFields) {
             query = query.select(selectFields);
         }
@@ -70,7 +72,7 @@ export const getOrderByCustomerId = async (req, res) => {
 
         const [orders, total] = await Promise.all([
             query,
-            usePagination ? Order.countDocuments({ customerId }) : Promise.resolve(null)
+            usePagination ? Order.countDocuments(filter) : Promise.resolve(null)
         ]);
 
         if (!usePagination) {
@@ -95,10 +97,11 @@ export const getOrderByCustomerId = async (req, res) => {
 export const getOrderByArtisanId = async (req, res) => {
     const artisanId = req.user.id
     try {
+        const filter = buildOrderFilter({ ownerKey: "artisanId", ownerId: artisanId, query: req.query });
         const { page, limit, skip, usePagination } = getPagination(req.query);
         const selectFields = buildSelect(req.query.fields);
 
-        let query = Order.find({ artisanId }).sort({ createdAt: -1 });
+        let query = Order.find(filter).sort({ createdAt: -1 });
         if (selectFields) {
             query = query.select(selectFields);
         }
@@ -127,7 +130,7 @@ export const getOrderByArtisanId = async (req, res) => {
             return res.status(200).json(orders);
         }
 
-        const total = await Order.countDocuments({ artisanId });
+        const total = await Order.countDocuments(filter);
         return res.status(200).json({
             data: orders,
             meta: {
@@ -387,4 +390,42 @@ const buildSelect = (fields) => {
     if (cleaned.length === 0) return null;
     if (!cleaned.includes("_id")) cleaned.unshift("_id");
     return cleaned.join(" ");
+};
+
+const buildOrderFilter = ({ ownerKey, ownerId, query = {} }) => {
+    const filter = { [ownerKey]: ownerId };
+
+    if (query.status) {
+        const statuses = String(query.status)
+            .split(",")
+            .map((status) => status.trim().toLowerCase())
+            .filter(Boolean);
+
+        if (statuses.length === 1) {
+            filter.repairStatus = statuses[0];
+        } else if (statuses.length > 1) {
+            filter.repairStatus = { $in: statuses };
+        }
+    }
+
+    if (query.search) {
+        const term = escapeRegex(query.search);
+        const regex = new RegExp(term, "i");
+        const orFilters = [
+            { problem: regex },
+            { location: regex }
+        ];
+
+        if (mongoose.Types.ObjectId.isValid(query.search)) {
+            orFilters.push({ _id: query.search });
+        }
+
+        filter.$or = orFilters;
+    }
+
+    return filter;
+};
+
+const escapeRegex = (value) => {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
